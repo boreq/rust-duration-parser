@@ -1,3 +1,47 @@
+//! Parses human-readable duration strings. I wrote this crate because a) I was bored b) the
+//! existing ones don't let you configure the units.
+//!
+//! ```
+//! use duration_parser::{Config, Error, Parser, Unit, UnitMagnitude, UnitName, Units};
+//! use std::time::Duration;
+//!
+//! fn main() -> Result<(), Error> {
+//!     let parser = Parser::new(Config::new(Units::new(&[
+//!         Unit::new(
+//!             UnitMagnitude::new(Duration::from_secs(1))?,
+//!             &[
+//!                 UnitName::new("second".to_string())?,
+//!                 UnitName::new("seconds".to_string())?,
+//!                 UnitName::new("s".to_string())?,
+//!             ],
+//!         )?,
+//!         Unit::new(
+//!             UnitMagnitude::new(Duration::from_secs(60))?,
+//!             &[
+//!                 UnitName::new("minute".to_string())?,
+//!                 UnitName::new("minutes".to_string())?,
+//!                 UnitName::new("m".to_string())?,
+//!             ],
+//!         )?,
+//!         Unit::new(
+//!             UnitMagnitude::new(Duration::from_secs(60 * 60))?,
+//!             &[
+//!                 UnitName::new("hour".to_string())?,
+//!                 UnitName::new("hours".to_string())?,
+//!                 UnitName::new("h".to_string())?,
+//!             ],
+//!         )?,
+//!     ])?)?);
+//!
+//!     println!("1: {:?}", parser.parse("1 hour 2 minutes 3 seconds")?);
+//!     println!("2: {:?}", parser.parse("1hour 2minutes 3seconds")?);
+//!     println!("3: {:?}", parser.parse("1h2m3s")?);
+//!
+//!     Ok(())
+//! }
+//!
+//! ```
+
 use std::fmt::Display;
 use std::str::Chars;
 use std::{collections::HashSet, time::Duration};
@@ -363,6 +407,7 @@ impl Unit {
     }
 }
 
+// Defines a name of a unit. Valid characters are: letters, `_`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct UnitName {
     name: String,
@@ -404,24 +449,40 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum Error {
+    /// A list of units has a length of 0. This is nonsense because in this case using the parser
+    /// will always fail for all inputs.
     #[error("units are empty")]
     UnitsAreEmpty,
 
+    /// Two of the defined units have an identical name in common which makes it impossible to
+    /// determine which one to use.
     #[error("units have the same name, if this isn't a mistake change them to a single unit")]
     UnitsHaveConflictingNames,
 
+    /// Two of the defined units have the same magnitude which is probably a mistake. Make them a
+    /// single unit if this is on purpose.
     #[error("units have the same magnitude, if this isn't a mistake change them to a single unit")]
     UnitsHaveConflictingMagnitudes,
 
+    /// The same name was defined twice for a unit.
     #[error("a unit has duplicate names")]
     UnitHasDuplicateNames,
 
+    /// Unit name is an empty string.
     #[error("unit name can't be an empty string")]
     UnitNameIsEmpty,
 
+    /// Unit name contains invalid characters.
+    #[error("unit name contains invalid characters")]
+    UnitNameContainsInvalidCharacters,
+
+    /// Magnitude of a unit can't be zero. This is nonsense because then the unit is useless and
+    /// contributes nothing to the duration.
     #[error("unit magnitude can't be zero")]
     UnitMagnitudeIsZero,
 
+    /// Input is malformed. One of the unit names has invalid characters in it. See [`UnitName`]
+    /// for a list of valid characters.
     #[error("invalid unit name in input: '{name}'")]
     InputInvalidUnitName {
         name: String,
@@ -429,15 +490,19 @@ pub enum Error {
         source: Box<Error>,
     },
 
+    // Input is malformed. One of the unit names wasn't defined in the list of units.
     #[error("unknown unit in input: '{name}'")]
     InputUnknownUnit { name: UnitName },
 
+    /// Input is malformed. One of the unit values is malformed.
     #[error("invalid value in input: '{value}'")]
     InputInvalidValue { value: String },
 
+    /// Input is malformed.
     #[error("malformed input: {0}")]
     InputMalformed(String),
 
+    /// The duration value which was created can't be stored as [`std::time::Duration`].
     #[error("the resulting value is incompatibile with std::time::Duration: {0}")]
     ErrorCreatingDuration(String),
 }
@@ -694,9 +759,7 @@ mod tests {
                 ],
                 input: " 1 hour 2.5 minutes",
 
-                expected_result: Err(Error::InputMalformed(
-                    "expected a digit".to_string(),
-                )),
+                expected_result: Err(Error::InputMalformed("expected a digit".to_string())),
             },
             TestCase {
                 name: "insane_space_suffix",

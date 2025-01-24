@@ -88,29 +88,28 @@ impl StateFn for StateStart {
         _: &mut ParsedInput,
     ) -> Result<Option<Box<dyn StateFn>>> {
         result.components.push(Component::empty());
-        return Ok(Some(Box::new(StateValue {})));
+        return Ok(Some(Box::new(StateValueBeforeDot {})));
     }
 }
 
-struct StateValue {}
+struct StateValueBeforeDot {}
 
-impl StateFn for StateValue {
+impl StateFn for StateValueBeforeDot {
     fn run(
         &self,
         result: &mut ParsingResult,
         input: &mut ParsedInput,
     ) -> Result<Option<Box<dyn StateFn>>> {
         match input.peek() {
-            Some(ch) => {
-                if ch.is_numeric() || ch == '.' {
+            Some(ch) => match ch {
+                ch if ch.is_numeric() => {
                     let last = &result.components.len() - 1;
                     result.components[last].value += &input.next().unwrap().to_string();
-                } else {
-                    return Err(Error::InputMalformed(
-                        "expected a number or a dot".to_string(),
-                    ));
                 }
-            }
+                _ => {
+                    return Err(Error::InputMalformed("expected a digit".to_string()));
+                }
+            },
             None => {
                 return Err(Error::InputMalformed(
                     "input ended prematurely while parsing a value".to_string(),
@@ -120,15 +119,68 @@ impl StateFn for StateValue {
 
         loop {
             match input.peek() {
-                Some(ch) => {
-                    if ch.is_numeric() || ch == '.' {
+                Some(ch) => match ch {
+                    '.' => {
                         let last = &result.components.len() - 1;
                         result.components[last].value += &input.next().unwrap().to_string();
-                        continue;
+                        return Ok(Some(Box::new(StateValueAfterDot {})));
                     }
-                    input.consume_all_spaces();
-                    return Ok(Some(Box::new(StateUnit {})));
+                    ch if ch.is_numeric() => {
+                        let last = &result.components.len() - 1;
+                        result.components[last].value += &input.next().unwrap().to_string();
+                    }
+                    _ => {
+                        input.consume_all_spaces();
+                        return Ok(Some(Box::new(StateUnit {})));
+                    }
+                },
+                None => {
+                    return Err(Error::InputMalformed(
+                        "input ended prematurely while parsing a value".to_string(),
+                    ))
                 }
+            }
+        }
+    }
+}
+
+struct StateValueAfterDot {}
+
+impl StateFn for StateValueAfterDot {
+    fn run(
+        &self,
+        result: &mut ParsingResult,
+        input: &mut ParsedInput,
+    ) -> Result<Option<Box<dyn StateFn>>> {
+        match input.peek() {
+            Some(ch) => match ch {
+                ch if ch.is_numeric() => {
+                    let last = &result.components.len() - 1;
+                    result.components[last].value += &input.next().unwrap().to_string();
+                }
+                _ => {
+                    return Err(Error::InputMalformed("expected a digit".to_string()));
+                }
+            },
+            None => {
+                return Err(Error::InputMalformed(
+                    "input ended prematurely while parsing a value".to_string(),
+                ))
+            }
+        }
+
+        loop {
+            match input.peek() {
+                Some(ch) => match ch {
+                    ch if ch.is_numeric() => {
+                        let last = &result.components.len() - 1;
+                        result.components[last].value += &input.next().unwrap().to_string();
+                    }
+                    _ => {
+                        input.consume_all_spaces();
+                        return Ok(Some(Box::new(StateUnit {})));
+                    }
+                },
                 None => {
                     return Err(Error::InputMalformed(
                         "input ended prematurely while parsing a value".to_string(),
@@ -178,7 +230,7 @@ impl StateFn for StateUnit {
 
                     result.components.push(Component::empty());
                     input.consume_all_spaces();
-                    return Ok(Some(Box::new(StateValue {})));
+                    return Ok(Some(Box::new(StateValueBeforeDot {})));
                 }
                 None => return Ok(None),
             }
@@ -577,6 +629,40 @@ mod tests {
                 )),
             },
             TestCase {
+                name: "value_starts_with_a_dot",
+
+                units: &[
+                    Unit::new(
+                        UnitMagnitude::new(Duration::from_secs(60 * 60))?,
+                        &[UnitName::new("hour")?, UnitName::new("hours")?],
+                    )?,
+                    Unit::new(
+                        UnitMagnitude::new(Duration::from_secs(60))?,
+                        &[UnitName::new("minute")?, UnitName::new("minutes")?],
+                    )?,
+                ],
+                input: ".5 minutes",
+
+                expected_result: Err(Error::InputMalformed("expected a digit".to_string())),
+            },
+            TestCase {
+                name: "value_ends_with_a_dot",
+
+                units: &[
+                    Unit::new(
+                        UnitMagnitude::new(Duration::from_secs(60 * 60))?,
+                        &[UnitName::new("hour")?, UnitName::new("hours")?],
+                    )?,
+                    Unit::new(
+                        UnitMagnitude::new(Duration::from_secs(60))?,
+                        &[UnitName::new("minute")?, UnitName::new("minutes")?],
+                    )?,
+                ],
+                input: "5. minutes",
+
+                expected_result: Err(Error::InputMalformed("expected a digit".to_string())),
+            },
+            TestCase {
                 name: "valid",
 
                 units: &[
@@ -608,7 +694,9 @@ mod tests {
                 ],
                 input: " 1 hour 2.5 minutes",
 
-                expected_result: Err(Error::InputMalformed("expected a number or a dot".to_string())),
+                expected_result: Err(Error::InputMalformed(
+                    "expected a digit".to_string(),
+                )),
             },
             TestCase {
                 name: "insane_space_suffix",

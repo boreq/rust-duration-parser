@@ -345,6 +345,7 @@ impl Config {
     }
 }
 
+/// Stores units which have unique magnitues and unique names.
 #[derive(Debug)]
 pub struct Units {
     units: Vec<Unit>,
@@ -407,7 +408,7 @@ impl Unit {
     }
 }
 
-// Defines a name of a unit. Valid characters are: letters, `_`.
+/// Defines a name of a unit. Valid characters are: letters, `_`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct UnitName {
     name: String,
@@ -430,6 +431,7 @@ impl Display for UnitName {
     }
 }
 
+/// Defines the duration represented by a single instance of a particular unit.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct UnitMagnitude {
     magnitude: Duration,

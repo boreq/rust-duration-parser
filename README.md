@@ -3,7 +3,8 @@
 Parses human-readable duration strings. I wrote this crate because:
 
 1. I was bored,
-2. the existing ones don't let you configure the units.
+2. the existing ones don't let you configure the units,
+3. I want to be able to enforce if spaces occur the input string.
 
 I've no idea how to write rust library code though so the interfaces may be
 insane.
@@ -12,7 +13,7 @@ insane.
 
 ```
 [dependencies]
-duration_parser = { git = "https://github.com/boreq/rust-duration-parser", tag="v0.0.2" }
+duration_parser = { git = "https://github.com/boreq/rust-duration-parser", tag="v0.0.3" }
 ```
 
 ## Example

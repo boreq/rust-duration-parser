@@ -1,5 +1,6 @@
 //! Parses human-readable duration strings. I wrote this crate because a) I was bored b) the
-//! existing ones don't let you configure the units.
+//! existing ones don't let you configure the units c) I want to be able to enforce if spaces occur
+//! in the input string.
 //!
 //! ```
 //!use duration_parser::{Config, Error, Parser, Unit, UnitMagnitude, UnitName, Units};

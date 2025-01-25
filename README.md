@@ -22,7 +22,7 @@ use duration_parser::{Config, Error, Parser, Unit, UnitMagnitude, UnitName, Unit
 use std::time::Duration;
 
 fn main() -> Result<(), Error> {
-    let parser = Parser::new(Config::new(Units::new(&[
+    let config = Config::new(Units::new(&[
         Unit::new(
             UnitMagnitude::new(Duration::from_secs(1))?,
             &[
@@ -47,7 +47,11 @@ fn main() -> Result<(), Error> {
                 UnitName::new("h".to_string())?,
             ],
         )?,
-    ])?)?);
+    ])?)?
+    .with_policy_for_spaces_between_value_and_unit(duration_parser::SpacePolicy::AllowOne)
+    .with_policy_for_spaces_between_components(duration_parser::SpacePolicy::AllowOne);
+
+    let parser = Parser::new(config);
 
     println!("1: {:?}", parser.parse("1 hour 2 minutes 3 seconds")?);
     println!("2: {:?}", parser.parse("1hour 2minutes 3seconds")?);
